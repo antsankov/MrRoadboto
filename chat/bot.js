@@ -1,7 +1,7 @@
 var botBuilder = require('claudia-bot-builder'),
   fbTemplate = botBuilder.fbTemplate;
 
-const resorts = ['A-basin', 'Breck', 'Keystone'];
+const resorts = ['A-basin', 'Breck', 'Keystone', 'Vail', 'Copper Mountain'];
 
 module.exports = botBuilder(message => {
   if (message.type === 'facebook') {
