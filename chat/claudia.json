@@ -1,0 +1,11 @@
+{
+  "lambda": {
+    "role": "roadbotochat-executor",
+    "name": "roadbotochat",
+    "region": "us-east-1"
+  },
+  "api": {
+    "id": "2iq4d32cci",
+    "module": "bot"
+  }
+}

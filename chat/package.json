@@ -1,0 +1,27 @@
+{
+  "name": "roadbotochat",
+  "version": "1.0.0",
+  "description": "Messenger bot for colorado road information",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antsankov/roadbotoChat.git"
+  },
+  "keywords": [
+    "messenger",
+    "cdot",
+    "road"
+  ],
+  "author": "Alex Tsankov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/antsankov/roadbotoChat/issues"
+  },
+  "homepage": "https://github.com/antsankov/roadbotoChat#readme",
+  "dependencies": {
+    "claudia-bot-builder": "^2.0.0"
+  }
+}
