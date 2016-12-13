@@ -6,5 +6,5 @@ update-chat:
 digest-local:
 	python digestor/digestor.py
 
-digest-remote:
+digest-remote:	
 	python digestor/digestor.py --live=True
