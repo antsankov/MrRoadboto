@@ -1,7 +1,8 @@
 import xmltodict
 import argparse
 from datetime import datetime
-
+import redis
+import hashlib
 
 OBSERVED_ROUTE_IDS = set([
              '11',  # Vail-Vail Pass
@@ -18,6 +19,7 @@ VAIL_ROUTES = set([11,10,9,6,5060,4,3,2])
 COPPER_BRECK_ROUTES = set([9,6,5060,4,3,2])
 KEYSTONE_ABASIN_ROUTES = set([6,5060,4,3,2])
 
+cache = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 class Resort:
 
@@ -52,16 +54,19 @@ class Resort:
 
     def generate_message(self): 
         if len(self.closed_routes) != 0:
-            return 'I70 is CLOSED between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
+            message = 'I70 is CLOSED between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
                     aggregate_route= route_digest(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
         
         elif len(self.hazardous_routes) != 0:
-            return 'I70 is OPEN, but is being impacted by weather between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
+            message = 'I70 is OPEN, but is being impacted by weather between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
                      aggregate_route= route_digest(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
 
         else:  
-            return 'I70 is OPEN, and unaffected by weather. This affects {resort}. Calculated on {date}.'.format(
-                    resort=self.name, date=earliest_date(dates))
+            message = 'I70 is OPEN, and unaffected by weather. This affects {resort}. Calculated on {date}.'.format(
+                    resort=self.name, date=earliest_date(self.dates))
+        print(message)
+        cache.set(self.name, message)
+
 
 def route_digest(route_names):
     first = route_names[0].split('-')[0]
@@ -82,13 +87,18 @@ def main():
     args = parser.parse_args() 
     raw = gather_observed_routes(args.live)
 
+    if raw == []:
+        print('NO CHANGE, NOT UPDATING')
+        return
+
     vail = Resort('Vail', VAIL_ROUTES, raw) 
     breck = Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
     arapahoe_basin = Resort('Araphaoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
 
-    print(vail.generate_message())
-    print(breck.generate_message())
-    print(arapahoe_basin.generate_message())
+    vail.generate_message()
+    breck.generate_message()
+    arapahoe_basin.generate_message()
+
 
 def gather_observed_routes(live=False):
     """
@@ -107,6 +117,10 @@ def gather_observed_routes(live=False):
         url = "https://{0}:{1}@data.cotrip.org/xml/road_conditions.xml".format(
                 username, urllib.quote(password, safe=''))
         r = requests.get(url)
+
+        if not content_update(r.content):
+            return []
+
         weather_routes = xmltodict.parse(r.content)
     
     else:
@@ -119,6 +133,18 @@ def gather_observed_routes(live=False):
             observed_routes.append(route)
  
     return observed_routes
+
+def content_update(content):
+    new_hash = hashlib.sha224(content).hexdigest()
+    old_hash = cache.get('hash')
+    print('NEW_HASH IS ', new_hash)
+    print('OLD_HASH IS ', old_hash)
+    if old_hash == new_hash:
+        return False
+    
+    else:
+        cache.set('hash', new_hash)
+        return True
 
 
 if __name__ == '__main__':
