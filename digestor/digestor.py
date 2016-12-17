@@ -3,6 +3,7 @@ import argparse
 from datetime import datetime
 import redis
 import hashlib
+import os
 
 OBSERVED_ROUTE_IDS = set([
              '11',  # Vail-Vail Pass
@@ -55,11 +56,11 @@ class Resort:
     def generate_message(self): 
         if len(self.closed_routes) != 0:
             message = 'I70 is CLOSED between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
-                    aggregate_route= route_digest(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
+                    aggregate_route= route_summarizer(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
         
         elif len(self.hazardous_routes) != 0:
             message = 'I70 is OPEN, but is being impacted by weather between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
-                     aggregate_route= route_digest(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
+                     aggregate_route= route_summarizer(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
 
         else:  
             message = 'I70 is OPEN, and unaffected by weather. This affects {resort}. Calculated on {date}.'.format(
@@ -68,7 +69,7 @@ class Resort:
         cache.set(self.name, message)
 
 
-def route_digest(route_names):
+def route_summarizer(route_names):
     first = route_names[0].split('-')[0]
     last = route_names[-1].split('-')[1]
     return '{0} and {1}'.format(first, last)
@@ -83,9 +84,9 @@ def earliest_date(dates):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--live', type=bool, default=False)
+    parser.add_argument('--local', action='store_true', default=False)
     args = parser.parse_args() 
-    raw = gather_observed_routes(args.live)
+    raw = gather_observed_routes(args.local)
 
     if raw == []:
         print('NO CHANGE, NOT UPDATING')
@@ -100,14 +101,19 @@ def main():
     arapahoe_basin.generate_message()
 
 
-def gather_observed_routes(live=False):
+def gather_observed_routes(local):
     """
     Gathers and reurns an array of parsed route dictionaries based on route_ids.
     """
+ 
     observed_routes = []
-    if live:
-        print('===RUNNING LIVE===')
-        import os
+    if local:
+        print('---RUNNING LOCAL---')
+        weather_routes = xmltodict.parse(
+                open('../schema/road_conditions.xml', 'r').read())
+    
+    else:
+        print('===RUNNING LIVE===') 
         import requests
         import urllib
 
@@ -121,12 +127,7 @@ def gather_observed_routes(live=False):
         if not content_update(r.content):
             return []
 
-        weather_routes = xmltodict.parse(r.content)
-    
-    else:
-        print('---RUNNING LOCAL---')
-        weather_routes = xmltodict.parse(
-                open('../schema/road_conditions.xml', 'r').read())
+        weather_routes = xmltodict.parse(r.content) 
 
     for route in weather_routes["rc:RoadConditionsDetails"]["rc:WeatherRoute"]:
         if route["rc:WeatherRouteId"] in OBSERVED_ROUTE_IDS:
@@ -137,12 +138,11 @@ def gather_observed_routes(live=False):
 def content_update(content):
     new_hash = hashlib.sha224(content).hexdigest()
     old_hash = cache.get('hash')
-    print('NEW_HASH IS ', new_hash)
-    print('OLD_HASH IS ', old_hash)
     if old_hash == new_hash:
         return False
     
     else:
+        print('content_change')
         cache.set('hash', new_hash)
         return True
 
