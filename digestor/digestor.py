@@ -4,6 +4,7 @@ from datetime import datetime
 import redis
 import hashlib
 import os
+import logging
 
 OBSERVED_ROUTE_IDS = set([
              '11',  # Vail-Vail Pass
@@ -20,7 +21,7 @@ VAIL_ROUTES = set([11,10,9,6,5060,4,3,2])
 COPPER_BRECK_ROUTES = set([9,6,5060,4,3,2])
 KEYSTONE_ABASIN_ROUTES = set([6,5060,4,3,2])
 
-cache = redis.StrictRedis(host='localhost', port=6379, db=0)
+cache = redis.StrictRedis(host=os.getenv('cache_ip'), port=6379, db=0)
 
 class Resort:
 
@@ -31,8 +32,7 @@ class Resort:
         
         self.closed_routes = []
         self.hazardous_routes = []
-        self.dates = []
-        # TODO is the date of everything always the same? 
+        self.dates = [] 
 
         for route in self.raw_routes:
             if int(route['rc:WeatherRouteId']) in self.watched_routes:
@@ -65,7 +65,7 @@ class Resort:
         else:  
             message = 'I70 is OPEN, and unaffected by weather. This affects {resort}. Calculated on {date}.'.format(
                     resort=self.name, date=earliest_date(self.dates))
-        print(message)
+        logging.debug(message)
         cache.set(self.name, message)
 
 
@@ -82,24 +82,6 @@ def earliest_date(dates):
 
     return earliest.strftime('%m/%d @ %I:%M %p')
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--local', action='store_true', default=False)
-    args = parser.parse_args() 
-    raw = gather_observed_routes(args.local)
-
-    if raw == []:
-        print('NO CHANGE, NOT UPDATING')
-        return
-
-    vail = Resort('Vail', VAIL_ROUTES, raw) 
-    breck = Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
-    arapahoe_basin = Resort('Araphaoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
-
-    vail.generate_message()
-    breck.generate_message()
-    arapahoe_basin.generate_message()
-
 
 def gather_observed_routes(local):
     """
@@ -108,12 +90,12 @@ def gather_observed_routes(local):
  
     observed_routes = []
     if local:
-        print('---RUNNING LOCAL---')
+        logging.info('GATHERING_LOCAL')
         weather_routes = xmltodict.parse(
                 open('../schema/road_conditions.xml', 'r').read())
     
     else:
-        print('===RUNNING LIVE===') 
+        logging.info('GATHERING_LIVE') 
         import requests
         import urllib
 
@@ -142,10 +124,25 @@ def content_update(content):
         return False
     
     else:
-        print('content_change')
+        logging.info('DATA_CHANGE') 
         cache.set('hash', new_hash)
         return True
 
 
-if __name__ == '__main__':
-    main()
+def handler(event, context):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--local', action='store_true', default=False)
+    args = parser.parse_args() 
+    raw = gather_observed_routes(args.local)
+
+    if raw == []:
+        logging.info('NO CHANGE') 
+        return
+
+    vail = Resort('Vail', VAIL_ROUTES, raw) 
+    breck = Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
+    arapahoe_basin = Resort('Araphaoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
+
+    vail.generate_message()
+    breck.generate_message()
+    arapahoe_basin.generate_message()
