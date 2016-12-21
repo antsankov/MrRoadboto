@@ -4,7 +4,6 @@ from datetime import datetime
 import redis
 import hashlib
 import os
-import logging
 
 OBSERVED_ROUTE_IDS = set([
              '11',  # Vail-Vail Pass
@@ -21,7 +20,7 @@ VAIL_ROUTES = set([11,10,9,6,5060,4,3,2])
 COPPER_BRECK_ROUTES = set([9,6,5060,4,3,2])
 KEYSTONE_ABASIN_ROUTES = set([6,5060,4,3,2])
 
-cache = redis.StrictRedis(host=os.getenv('cache_ip'), port=6379, db=0)
+cache = None 
 
 class Resort:
 
@@ -53,7 +52,7 @@ class Resort:
                     self.hazardous_routes.append(route_state['route_name'])
                     self.dates.append(route_state['date'])
 
-    def generate_message(self): 
+    def generate_message(self):
         if len(self.closed_routes) != 0:
             message = 'I70 is CLOSED between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
                     aggregate_route= route_summarizer(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
@@ -65,7 +64,8 @@ class Resort:
         else:  
             message = 'I70 is OPEN, and unaffected by weather. This affects {resort}. Calculated on {date}.'.format(
                     resort=self.name, date=earliest_date(self.dates))
-        logging.debug(message)
+        
+        print('{} - {}'.format(self.name, message))
         cache.set(self.name, message)
 
 
@@ -90,12 +90,11 @@ def gather_observed_routes(local):
  
     observed_routes = []
     if local:
-        logging.info('GATHERING_LOCAL')
+        print('GATHERING_LOCAL')
         weather_routes = xmltodict.parse(
                 open('../schema/road_conditions.xml', 'r').read())
     
-    else:
-        logging.info('GATHERING_LIVE') 
+    else: 
         import requests
         import urllib
 
@@ -104,40 +103,42 @@ def gather_observed_routes(local):
 
         url = "https://{0}:{1}@data.cotrip.org/xml/road_conditions.xml".format(
                 username, urllib.quote(password, safe=''))
-        r = requests.get(url)
-
+    
+        r = requests.get(url) 
         if not content_update(r.content):
             return []
-
+        
         weather_routes = xmltodict.parse(r.content) 
-
+ 
     for route in weather_routes["rc:RoadConditionsDetails"]["rc:WeatherRoute"]:
         if route["rc:WeatherRouteId"] in OBSERVED_ROUTE_IDS:
             observed_routes.append(route)
- 
+
     return observed_routes
 
 def content_update(content):
     new_hash = hashlib.sha224(content).hexdigest()
     old_hash = cache.get('hash')
-    if old_hash == new_hash:
+    if old_hash == new_hash: 
         return False
     
     else:
-        logging.info('DATA_CHANGE') 
         cache.set('hash', new_hash)
         return True
 
 
 def handler(event, context):
+
+    global cache
+    cache = redis.StrictRedis(host=os.getenv('cache_ip'), port=6379, db=0)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--local', action='store_true', default=False)
     args = parser.parse_args() 
     raw = gather_observed_routes(args.local)
 
-    if raw == []:
-        logging.info('NO CHANGE') 
-        return
+    if raw == []: 
+        return "No update."
 
     vail = Resort('Vail', VAIL_ROUTES, raw) 
     breck = Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
@@ -146,3 +147,5 @@ def handler(event, context):
     vail.generate_message()
     breck.generate_message()
     arapahoe_basin.generate_message()
+
+    return "Data updated."
