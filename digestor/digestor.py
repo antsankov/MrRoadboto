@@ -119,6 +119,7 @@ def gather_observed_routes(local):
 def content_update(content):
     new_hash = hashlib.sha224(content).hexdigest()
     old_hash = cache.get('hash')
+
     if old_hash == new_hash: 
         return False
     
