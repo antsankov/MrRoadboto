@@ -143,7 +143,7 @@ def handler(event, context):
 
     vail = Resort('Vail', VAIL_ROUTES, raw) 
     breck = Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
-    arapahoe_basin = Resort('Araphaoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
+    arapahoe_basin = Resort('Arapahoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
 
     vail.generate_message()
     breck.generate_message()
