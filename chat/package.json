@@ -23,6 +23,7 @@
   "homepage": "https://github.com/antsankov/roadbotoChat#readme",
   "dependencies": {
     "claudia-bot-builder": "^2.0.0",
-    "redis": "^2.6.3"
+    "redis": "^2.6.3",
+    "bluebird": "^3.4.7"
   }
 }
