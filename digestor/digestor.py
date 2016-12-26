@@ -62,7 +62,7 @@ class Resort:
                     aggregate_route= route_summarizer(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
         
         elif len(self.hazardous_routes) != 0:
-            message = 'I70 is OPEN, but is being impacted by weather between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
+            message = 'I70 is OPEN, but is being impacted by weather from {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
                      aggregate_route= route_summarizer(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
 
         else:  
@@ -73,10 +73,11 @@ class Resort:
         cache.set(self.name, message)
 
 
+# TODO, include the east - west part here.
 def route_summarizer(route_names):
     first = route_names[0].split('-')[0]
     last = route_names[-1].split('-')[1]
-    return '{0} and {1}'.format(first, last)
+    return '{0} to {1}'.format(first, last)
 
 def earliest_date(dates):
     earliest = dates[0]
@@ -133,7 +134,7 @@ def content_update(content):
 def handler(event, context, local=False):
 
     global cache
-    cache = redis.StrictRedis(host=os.getenv('cache_ip'), port=6379, db=0)
+    cache = redis.StrictRedis(host=os.getenv('cache_ip'), port=int(os.getenv('port')), db=0)
     
     raw = gather_observed_routes(local)
 
@@ -145,9 +146,9 @@ def handler(event, context, local=False):
     Resort('Copper Mountain', COPPER_BRECK_ROUTES, raw)
     Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
 
-    Resort('Arapahoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
     Resort('Keystone', KEYSTONE_ABASIN_ROUTES, raw) 
-
+    Resort('Arapahoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
+    
     return 'Data updated.'
 
 if __name__ == '__main__': 
