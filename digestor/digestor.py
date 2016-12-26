@@ -1,5 +1,6 @@
+import requests
+import urllib
 import xmltodict
-import argparse
 from datetime import datetime
 import redis
 import hashlib
@@ -52,6 +53,9 @@ class Resort:
                     self.hazardous_routes.append(route_state['route_name'])
                     self.dates.append(route_state['date'])
 
+        self.generate_message()
+
+
     def generate_message(self):
         if len(self.closed_routes) != 0:
             message = 'I70 is CLOSED between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
@@ -95,13 +99,10 @@ def gather_observed_routes(local):
                 open('../schema/road_conditions.xml', 'r').read())
     
     else: 
-        import requests
-        import urllib
-
         username = os.getenv('username')
         password = os.getenv('password')
 
-        url = "https://{0}:{1}@data.cotrip.org/xml/road_conditions.xml".format(
+        url = 'https://{0}:{1}@data.cotrip.org/xml/road_conditions.xml'.format(
                 username, urllib.quote(password, safe=''))
     
         r = requests.get(url) 
@@ -110,8 +111,8 @@ def gather_observed_routes(local):
         
         weather_routes = xmltodict.parse(r.content) 
  
-    for route in weather_routes["rc:RoadConditionsDetails"]["rc:WeatherRoute"]:
-        if route["rc:WeatherRouteId"] in OBSERVED_ROUTE_IDS:
+    for route in weather_routes['rc:RoadConditionsDetails']['rc:WeatherRoute']:
+        if route['rc:WeatherRouteId'] in OBSERVED_ROUTE_IDS:
             observed_routes.append(route)
 
     return observed_routes
@@ -124,29 +125,35 @@ def content_update(content):
         return False
     
     else:
+        print('new: ' + new_hash)
         cache.set('hash', new_hash)
         return True
 
 
-def handler(event, context):
+def handler(event, context, local=False):
 
     global cache
     cache = redis.StrictRedis(host=os.getenv('cache_ip'), port=6379, db=0)
     
+    raw = gather_observed_routes(local)
+
+    if raw == []: 
+        return 'No update.'
+
+    Resort('Vail', VAIL_ROUTES, raw) 
+    
+    Resort('Copper Mountain', COPPER_BRECK_ROUTES, raw)
+    Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
+
+    Resort('Arapahoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
+    Resort('Keystone', KEYSTONE_ABASIN_ROUTES, raw) 
+
+    return 'Data updated.'
+
+if __name__ == '__main__': 
+    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--local', action='store_true', default=False)
     args = parser.parse_args() 
-    raw = gather_observed_routes(args.local)
+    handler(None, None, args.local)
 
-    if raw == []: 
-        return "No update."
-
-    vail = Resort('Vail', VAIL_ROUTES, raw) 
-    breck = Resort('Breckenridge', COPPER_BRECK_ROUTES, raw) 
-    arapahoe_basin = Resort('Arapahoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
-
-    vail.generate_message()
-    breck.generate_message()
-    arapahoe_basin.generate_message()
-
-    return "Data updated."
