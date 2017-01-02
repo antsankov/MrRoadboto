@@ -17,22 +17,27 @@ const resorts = [
   'Keystone', 'Arapahoe Basin'
 ];
 
+//takes in a string and returns a FB version with all of the buttons.
+function MakeFB(content){
+  message = new fbTemplate.Text(content);
+  resorts.forEach(function(resort){
+    message.addQuickReply(resort, resort);
+  });
+  return message.get(); 
+}
+
 module.exports = botBuilder(request => {
   console.log('Req test: ' + request.text);
   // if it's in a resort
   if (resorts.indexOf(request.text) >= 0){ 
     return client.getAsync(request.text).then((res,err) => {
       if (err) {
-        console.log(err);
-        return 'There was an error! Oops.';
+        console.error(err);
+        return MakeFB('There was an error! Oops.');
       }  
-      return res;
+      return MakeFB(res);
     });
   } else {
-    message = new fbTemplate.Text('Which resort do you need road info about?');
-    resorts.forEach(function(resort){
-      message.addQuickReply(resort, resort);
-    });
-    return message.get(); 
+    return MakeFB('Which resort do you need road info about?');
   } 
 });
