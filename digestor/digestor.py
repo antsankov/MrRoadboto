@@ -84,7 +84,7 @@ class Resort:
                     aggregate_route= route_summarizer(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
         
         elif len(self.hazardous_routes) != 0:
-            message = 'I70 is OPEN, but is being impacted by {hazards} from {aggregate_route}. This affects {resort} resort. Calculated on {date}.'.format(
+            message = 'I70 is OPEN, but is being impacted by: {hazards} from {aggregate_route}. This affects {resort} resort. Calculated on {date}.'.format(
                      hazards= ', '.join(self.hazards), aggregate_route= route_summarizer(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
 
         else:  
@@ -106,7 +106,7 @@ def earliest_date(dates):
         if date < earliest:
             earliest = date
 
-    return earliest.strftime('%m/%d @ %I:%M %p')
+    return earliest.strftime('%m/%d at %I:%M %p')
 
 
 def gather_observed_routes(local):

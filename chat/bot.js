@@ -27,7 +27,7 @@ function MakeFB(content){
 }
 
 module.exports = botBuilder(request => {
-  console.log('Req test: ' + request.text);
+  console.log('req: ' + request.text);
   // if it's in a resort
   if (resorts.indexOf(request.text) >= 0){ 
     return client.getAsync(request.text).then((res,err) => {
