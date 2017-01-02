@@ -1,10 +1,24 @@
 import requests
 import urllib
-import xmltodict
 from datetime import datetime
 import redis
 import hashlib
 import os
+import logging
+
+
+ROAD_CONDITIONS = {
+        11 : 'No Data',
+        10 : 'Error',
+        9 : 'Dryness',
+        8 : 'Wetness',
+        7 : 'High Wind',
+        6 : 'Poor Visibility',
+        5 : 'Snow',
+        4 : 'Ice',
+        3 : 'Blowing Snow',
+        1 : 'Closed',
+}
 
 OBSERVED_ROUTE_IDS = set([
              '11',  # Vail-Vail Pass
@@ -22,6 +36,8 @@ COPPER_BRECK_ROUTES = set([9,6,5060,4,3,2])
 KEYSTONE_ABASIN_ROUTES = set([6,5060,4,3,2])
 
 cache = None 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 class Resort:
 
@@ -32,7 +48,9 @@ class Resort:
         
         self.closed_routes = []
         self.hazardous_routes = []
-        self.dates = [] 
+        self.dates = []
+
+        self.hazards = set([])
 
         for route in self.raw_routes:
             if int(route['rc:WeatherRouteId']) in self.watched_routes:
@@ -40,40 +58,43 @@ class Resort:
                         'id' : int(route['rc:WeatherRouteId']),
                         'route_name' : route['rc:RouteName'],
                         'date' : datetime.strptime(route['rc:CalculatedDate'].split('.')[0], '%Y-%m-%dT%H:%M:%S'),
+                        # included for extra protection with closures
                         'condition' : route['rc:RoadConditionCategoryTxt'],
                         'condition_code' : float(route['rc:RoadConditionCategoryCd']),
                         'hazardous' : bool(route['rc:IsHazardousCondition']),
                         }
- 
+                if route_state['condition_code'] == 10 or route_state['condition_code'] == None:
+                    logger.error('CDOT route code has an error.')
+
+                self.dates.append(route_state['date'])
+
                 if route_state['condition'] == 'Closed' or route_state['condition_code'] == 1:
-                    self.closed_routes.append(route_state['route_name'])
-                    self.dates.append(route_state['date'])
+                    self.closed_routes.append(route_state['route_name']) 
                 
-                elif route_state['hazardous']:   
-                    self.hazardous_routes.append(route_state['route_name'])
-                    self.dates.append(route_state['date'])
+                # TODO Can a route ever be dry and dangerous?
+                elif route_state['hazardous'] and route_state['condition_code'] != 9:
+                    self.hazardous_routes.append(route_state['route_name'])    
+                    self.hazards.add(ROAD_CONDITIONS.get(route_state['condition_code'],''))
 
         self.generate_message()
 
-
     def generate_message(self):
         if len(self.closed_routes) != 0:
-            message = 'I70 is CLOSED between {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
+            message = 'I70 is CLOSED between {aggregate_route}. This affects {resort} resort. Calculated on {date}.'.format(
                     aggregate_route= route_summarizer(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
         
         elif len(self.hazardous_routes) != 0:
-            message = 'I70 is OPEN, but is being impacted by weather from {aggregate_route}. This affects {resort}. Calculated on {date}.'.format(
-                     aggregate_route= route_summarizer(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
+            message = 'I70 is OPEN, but is being impacted by {hazards} from {aggregate_route}. This affects {resort} resort. Calculated on {date}.'.format(
+                     hazards= ', '.join(self.hazards), aggregate_route= route_summarizer(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
 
         else:  
-            message = 'I70 is OPEN, and unaffected by weather. This affects {resort}. Calculated on {date}.'.format(
+            message = 'I70 is OPEN, and unaffected by weather. This affects {resort} resort. Calculated on {date}.'.format(
                     resort=self.name, date=earliest_date(self.dates))
         
         print('{} - {}'.format(self.name, message))
         cache.set(self.name, message)
 
 
-# TODO, include the east - west part here.
 def route_summarizer(route_names):
     first = route_names[0].split('-')[0]
     last = route_names[-1].split('-')[1]
@@ -96,6 +117,7 @@ def gather_observed_routes(local):
     observed_routes = []
     if local:
         print('GATHERING_LOCAL')
+        import xmltodict
         weather_routes = xmltodict.parse(
                 open('../schema/road_conditions.xml', 'r').read())
     
@@ -109,7 +131,7 @@ def gather_observed_routes(local):
         r = requests.get(url) 
         if not content_update(r.content):
             return []
-        
+        import xmltodict
         weather_routes = xmltodict.parse(r.content) 
  
     for route in weather_routes['rc:RoadConditionsDetails']['rc:WeatherRoute']:
@@ -123,10 +145,11 @@ def content_update(content):
     old_hash = cache.get('hash')
 
     if old_hash == new_hash: 
+        logger.info('no update.')
         return False
     
     else:
-        print('new: ' + new_hash)
+        logger.info('new: ' + new_hash)
         cache.set('hash', new_hash)
         return True
 
@@ -134,7 +157,7 @@ def content_update(content):
 def handler(event, context, local=False):
 
     global cache
-    cache = redis.StrictRedis(host=os.getenv('cache_ip'), port=int(os.getenv('port')), db=0)
+    cache = redis.StrictRedis(host=os.getenv('hostname'), port=int(os.getenv('port')), db=0)
     
     raw = gather_observed_routes(local)
 
