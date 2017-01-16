@@ -34,6 +34,7 @@ OBSERVED_ROUTE_IDS = set([
 VAIL_ROUTES = set([11,10,9,6,5060,4,3,2])
 COPPER_BRECK_ROUTES = set([9,6,5060,4,3,2])
 KEYSTONE_ABASIN_ROUTES = set([6,5060,4,3,2])
+WINTER_PARK_ROUTES = set([4,3,2])
 
 cache = None 
 logger = logging.getLogger()
@@ -80,15 +81,15 @@ class Resort:
 
     def generate_message(self):
         if len(self.closed_routes) != 0:
-            message = 'I70 is CLOSED between {aggregate_route}. This affects {resort} resort. Calculated on {date}.'.format(
+            message = 'I70 is CLOSED between {aggregate_route}. This affects {resort} resort. Updated on {date}.'.format(
                     aggregate_route= route_summarizer(self.closed_routes), resort=self.name, date=earliest_date(self.dates)) 
         
         elif len(self.hazardous_routes) != 0:
-            message = 'I70 is OPEN, but is being impacted by: {hazards} from {aggregate_route}. This affects {resort} resort. Calculated on {date}.'.format(
+            message = 'I70 is OPEN, but is being impacted by: {hazards} from {aggregate_route}. This affects {resort} resort. Updated on {date}.'.format(
                      hazards= ', '.join(self.hazards), aggregate_route= route_summarizer(self.hazardous_routes), resort=self.name, date=earliest_date(self.dates)) 
 
         else:  
-            message = 'I70 is OPEN, and unaffected by weather. This affects {resort} resort. Calculated on {date}.'.format(
+            message = 'I70 is OPEN, and unaffected by weather. This affects {resort} resort. Updated on {date}.'.format(
                     resort=self.name, date=earliest_date(self.dates))
         
         print('{} - {}'.format(self.name, message))
@@ -172,6 +173,8 @@ def handler(event, context, local=False):
     Resort('Keystone', KEYSTONE_ABASIN_ROUTES, raw) 
     Resort('Arapahoe Basin', KEYSTONE_ABASIN_ROUTES, raw) 
     
+    Resort('Winter Park', WINTER_PARK_ROUTES, raw)
+
     return 'Data updated.'
 
 if __name__ == '__main__': 

@@ -14,7 +14,8 @@ client = redis.createClient(redisOptions);
 const resorts = [
   'Vail',
   'Copper Mountain', 'Breckenridge', 
-  'Keystone', 'Arapahoe Basin'
+  'Keystone', 'Arapahoe Basin',
+  'Winter Park'
 ];
 
 //takes in a string and returns a FB version with all of the buttons.
