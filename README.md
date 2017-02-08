@@ -1,7 +1,7 @@
 # Mr.Roadboto
 A low-bandwidth and easy to use Facebook chat bot that serves Colorado's Department of Transportation (CDOT) alerts for I70 road-closures affecting major ski resorts. You can read about the motivation [here](https://medium.com/@antsankov/domo-arigato-mr-roadboto-pt-1-introducing-the-problem-b0d44e384dc#.tcsq9nrs4).
 
-![img](http://i.imgur.com/6y0A4aJ.png)
+![img](http://imgur.com/3EEgDfe.png)
 
 ## Where does Mr.Roadboto live?
 MrRoadboto's Facebook page is [here](https://www.facebook.com/roadboto/). These messages go directly to AWS for parsing.
